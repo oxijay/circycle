@@ -9,6 +9,8 @@ import NewTrip from './components/trips/NewTrip';
 import Reports from './components/dashboard/Reports';
 import UserManagement from './components/auth/UserManagement';
 import LoginForm from './components/auth/LoginForm';
+import BagManagement from './components/bags/BagManagement';
+import MaterialLots from './components/materialLots/MaterialLots';  // เพิ่มบรรทัดนี้
 
 export default function HomePage() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -31,6 +33,8 @@ export default function HomePage() {
       <div className="flex-1">
         {currentView === 'dashboard' && <Dashboard />}
         {currentView === 'new-trip' && <NewTrip />}
+        {currentView === 'material-lots' && <MaterialLots />}  {/* เพิ่มบรรทัดนี้ */}
+        {currentView === 'bag-management' && <BagManagement />}
         {currentView === 'vehicles' && <VehicleManagement />}
         {currentView === 'reports' && <Reports />}
         {currentView === 'users' && <UserManagement />}
