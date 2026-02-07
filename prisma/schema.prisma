@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TripStatus {
+  PENDING           // รออกรถ
+  TRAVELING         // เดินทางไปโรงงาน
+  ARRIVED           // ถึงโรงงานแล้ว
+  WEIGHING_INITIAL  // ชั่งน้ำหนักเริ่มต้น
+  WEIGHING_FINAL    // ชั่งน้ำหนักสุดท้าย
+  PACKING           // บรรจุใส่เป้
+  COMPLETED         // เสร็จสิ้น
+}
+
+model Trip {
+  id                String     @id @default(uuid())
+  vehicle_id        String
+  customer_factory  String
+  departure_time    DateTime   @default(now())
+  arrival_time      DateTime?
+  return_time       DateTime?
+  initial_weight    Float      @default(0)
+  final_weight      Float      @default(0)
+  weight_difference Float      @default(0)
+  status            TripStatus @default(PENDING)
+  created_at        DateTime   @default(now())
+  updated_at        DateTime   @updatedAt
+
+  bags Bag[]
+
+  @@map("trips")
+}
+
+model Bag {
+  id         String   @id @default(uuid())
+  bag_code   String
+  weight     Float    @default(0)
+  material   String?
+  trip_id    String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  trip Trip @relation(fields: [trip_id], references: [id], onDelete: Cascade)
+
+  @@map("bags")
+}
