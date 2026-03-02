@@ -36,6 +36,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 - Local development: use `.env` / `.env.local` (localhost database)
 - Production deploy: copy `env.production.example` to your server as `.env` and replace all placeholder values
+- Full VPS guide: `docs/DEPLOY_HOSTINGER_VPS.md`
 
 ## Environment
 
