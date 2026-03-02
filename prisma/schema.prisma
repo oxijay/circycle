@@ -8,44 +8,336 @@ datasource db {
 }
 
 enum TripStatus {
-  PENDING           // รออกรถ
-  TRAVELING         // เดินทางไปโรงงาน
-  ARRIVED           // ถึงโรงงานแล้ว
-  WEIGHING_INITIAL  // ชั่งน้ำหนักเริ่มต้น
-  WEIGHING_FINAL    // ชั่งน้ำหนักสุดท้าย
-  PACKING           // บรรจุใส่เป้
-  COMPLETED         // เสร็จสิ้น
+  PENDING                    // รอออกรถ
+  TRAVELING                  // legacy
+  ARRIVED                    // legacy
+  WEIGHING_INITIAL           // legacy
+  WEIGHING_FINAL             // legacy
+  PACKING                    // legacy
+  WEIGHED_EMPTY_OUT          // ชั่งรถเปล่าก่อนออก
+  DEPARTED_PLANT             // ออกจากโรงงานเรา
+  ARRIVED_CUSTOMER           // ถึงโรงงานลูกค้า
+  LOADED_AT_CUSTOMER         // ขึ้นของเสร็จ
+  DEPARTED_CUSTOMER          // ออกจากโรงงานลูกค้า
+  ARRIVED_PLANT              // กลับถึงโรงงานเรา
+  WEIGHED_LOADED_IN          // ชั่งตอนรถมีของเข้า
+  UNLOADING                  // กำลังลงของ/บรรจุเป้
+  WEIGHED_EMPTY_AFTER_UNLOAD // ชั่งรถเปล่าหลังลงเสร็จ
+  RECONCILED                 // ปิดเที่ยวและกระทบยอดแล้ว
+  COMPLETED                  // เสร็จสิ้น
+}
+
+enum TripType {
+  INBOUND_PURCHASE // ขาไปรับวัตถุดิบเข้าโรงงานเรา
+  OUTBOUND_SALE    // ขาขนวัตถุดิบไปขายลูกค้า
+}
+
+enum TripPlanStatus {
+  DRAFT
+  SCHEDULED
+  OPENED
+  CANCELLED
+}
+
+enum PartnerType {
+  SUPPLIER // คู่ค้าฝั่งขายให้เรา
+  BUYER    // คู่ค้าฝั่งรับซื้อจากเรา
+  BOTH     // เป็นได้ทั้งสองบทบาท
+}
+
+enum UserRole {
+  WORKER
+  OFFICE
+  EXECUTIVE
+  ADMIN
 }
 
 model Trip {
   id                String     @id @default(uuid())
   vehicle_id        String
+  trip_type         TripType   @default(INBOUND_PURCHASE)
+  partner_id        String?
+  automil_vehicle_id String?
+  driver_name       String?
+  automil_driver_id String?
   customer_factory  String
   departure_time    DateTime   @default(now())
   arrival_time      DateTime?
   return_time       DateTime?
+  departed_plant_at DateTime?
+  arrived_customer_at DateTime?
+  departed_customer_at DateTime?
+  arrived_plant_at  DateTime?
   initial_weight    Float      @default(0)
   final_weight      Float      @default(0)
+  empty_weight_out  Float      @default(0)
+  customer_reported_weight Float @default(0)
+  loaded_weight_in  Float      @default(0)
+  empty_weight_after_unload Float @default(0)
+  our_net_weight    Float      @default(0)
   weight_difference Float      @default(0)
+  weight_variance   Float      @default(0)
+  weight_variance_pct Float    @default(0)
+  notes             String?
+  inbound_removed_at DateTime?
+  inbound_removed_reason String?
   status            TripStatus @default(PENDING)
   created_at        DateTime   @default(now())
   updated_at        DateTime   @updatedAt
 
-  bags Bag[]
+  bags      Bag[]
+  materials TripMaterial[]
+  partner   Partner?  @relation(fields: [partner_id], references: [id], onDelete: SetNull)
 
+  @@index([trip_type])
+  @@index([partner_id])
   @@map("trips")
+}
+
+model Partner {
+  id            String      @id @default(uuid())
+  partner_code  String?     @unique
+  name          String
+  factory_name  String?
+  partner_type  PartnerType @default(SUPPLIER)
+  tax_id        String?
+  contact_name  String?
+  phone         String?
+  email         String?
+  address       String?
+  notes         String?
+  is_active     Boolean     @default(true)
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+
+  trips Trip[]
+
+  @@index([partner_type, is_active])
+  @@map("partners")
+}
+
+model TripMaterial {
+  id                 String   @id @default(uuid())
+  trip_id            String
+  material_type      String
+  customer_weight    Float    @default(0)
+  received_weight    Float    @default(0)
+  bagged_weight      Float    @default(0)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  trip Trip @relation(fields: [trip_id], references: [id], onDelete: Cascade)
+
+  @@index([trip_id])
+  @@map("trip_materials")
+}
+
+model TripPlan {
+  id                String         @id @default(uuid())
+  trip_type         TripType       @default(INBOUND_PURCHASE)
+  planned_start_at  DateTime
+  vehicle_id        String
+  automil_vehicle_id String?
+  driver_name       String?
+  partner_id        String?
+  customer_factory  String
+  notes             String?
+  status            TripPlanStatus @default(SCHEDULED)
+  opened_trip_id    String?
+  opened_at         DateTime?
+  opened_by_user_id String?
+  created_by_user_id String?
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
+
+  @@index([status, planned_start_at])
+  @@index([planned_start_at])
+  @@index([partner_id])
+  @@index([opened_trip_id])
+  @@map("trip_plans")
+}
+
+enum BagStatus {
+  OPEN
+  PARTIAL
+  SOLD
+  SPLIT
+  CLOSED
 }
 
 model Bag {
   id         String   @id @default(uuid())
   bag_code   String
   weight     Float    @default(0)
+  current_weight Float @default(0)
   material   String?
+  note       String?
+  ready_for_sale Boolean @default(true)
+  filled_at  DateTime?
+  status     BagStatus @default(OPEN)
   trip_id    String
+  storage_slot_id String?
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  trip Trip @relation(fields: [trip_id], references: [id], onDelete: Cascade)
+  trip         Trip             @relation(fields: [trip_id], references: [id], onDelete: Cascade)
+  storage_slot StorageSlot?     @relation(fields: [storage_slot_id], references: [id], onDelete: SetNull)
+  movements    BagMovement[]    @relation("BagMovements")
+  referenced_by BagMovement[]   @relation("BagReferences")
+  allocations  SaleAllocation[]
 
+  @@index([storage_slot_id])
   @@map("bags")
+}
+
+model StorageZone {
+  id         String        @id @default(uuid())
+  zone_code  String        @unique
+  zone_name  String
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
+
+  slots StorageSlot[]
+  map_assignment StorageZoneMapAssignment?
+
+  @@map("storage_zones")
+}
+
+model StorageSlot {
+  id         String       @id @default(uuid())
+  zone_id    String
+  slot_code  String
+  slot_name  String?
+  is_active  Boolean      @default(true)
+  created_at DateTime     @default(now())
+  updated_at DateTime     @updatedAt
+
+  zone StorageZone @relation(fields: [zone_id], references: [id], onDelete: Cascade)
+  bags Bag[]
+
+  @@index([zone_id])
+  @@unique([zone_id, slot_code])
+  @@map("storage_slots")
+}
+
+model StorageZoneMapAssignment {
+  id         String   @id @default(uuid())
+  region_key String   @unique
+  zone_id    String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  zone StorageZone @relation(fields: [zone_id], references: [id], onDelete: Cascade)
+
+  @@index([zone_id])
+  @@map("storage_zone_map_assignments")
+}
+
+enum BagMovementType {
+  PACK_IN
+  SPLIT_OUT
+  SPLIT_IN
+  SALE_OUT
+  ADJUST_IN
+  ADJUST_OUT
+}
+
+model BagMovement {
+  id               String          @id @default(uuid())
+  bag_id           String
+  movement_type    BagMovementType
+  quantity         Float           @default(0)
+  material         String?
+  reference_bag_id String?
+  sale_reference   String?
+  note             String?
+  occurred_at      DateTime        @default(now())
+  created_at       DateTime        @default(now())
+
+  bag          Bag         @relation("BagMovements", fields: [bag_id], references: [id], onDelete: Cascade)
+  referenceBag Bag?        @relation("BagReferences", fields: [reference_bag_id], references: [id], onDelete: SetNull)
+
+  @@index([bag_id])
+  @@index([reference_bag_id])
+  @@map("bag_movements")
+}
+
+enum SaleStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+model SaleOrder {
+  id            String   @id @default(uuid())
+  sale_no       String   @unique
+  customer_name String
+  sold_at       DateTime @default(now())
+  status        SaleStatus @default(DRAFT)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  allocations SaleAllocation[]
+
+  @@map("sale_orders")
+}
+
+model SaleAllocation {
+  id          String   @id @default(uuid())
+  sale_id     String
+  bag_id      String
+  material    String?
+  quantity    Float    @default(0)
+  unit_price  Float    @default(0)
+  total_price Float    @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  sale SaleOrder @relation(fields: [sale_id], references: [id], onDelete: Cascade)
+  bag  Bag       @relation(fields: [bag_id], references: [id], onDelete: Restrict)
+
+  @@index([sale_id])
+  @@index([bag_id])
+  @@map("sale_allocations")
+}
+
+model AppUser {
+  id            String     @id @default(uuid())
+  employee_code String     @unique
+  display_name  String
+  role          UserRole   @default(WORKER)
+  is_active     Boolean    @default(true)
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+
+  audit_logs AuditLog[]
+
+  @@index([role, is_active])
+  @@map("app_users")
+}
+
+model AuditLog {
+  id            String    @id @default(uuid())
+  actor_user_id String?
+  actor_name    String?
+  actor_role    UserRole?
+  action        String
+  resource_type String
+  resource_id   String?
+  method        String
+  path          String
+  success       Boolean   @default(true)
+  status_code   Int       @default(200)
+  message       String?
+  ip_address    String?
+  user_agent    String?
+  metadata      Json?
+  created_at    DateTime  @default(now())
+
+  actor AppUser? @relation(fields: [actor_user_id], references: [id], onDelete: SetNull)
+
+  @@index([actor_user_id, created_at])
+  @@index([resource_type, resource_id])
+  @@index([created_at])
+  @@map("audit_logs")
 }

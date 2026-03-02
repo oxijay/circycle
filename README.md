@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Circycle
 
-## Getting Started
+Factory scrap operations app with trip tracking, weight reconciliation, bag (big bag) inventory, and dashboard-first UX.
 
-First, run the development server:
+## Engineering Guide
+
+- See `docs/ENGINEERING_BEST_PRACTICES.md` for coding standards and implementation rules used in this project.
+
+## Features
+
+- First page is an operations dashboard (`/`)
+- Vehicle status integration from Automil API (`/api/integrations/automil/vehicles`)
+- Daily trip timeline tracking (depart/arrive/customer/return)
+- Weight reconciliation (customer scale vs factory scale)
+- Bag inventory snapshot by scrap type
+- Workflow page for operations (`/operations`)
+
+## Prerequisites
+
+- Node.js 20+
+- PostgreSQL running on `localhost:5432`
+
+## Setup
 
 ```bash
+npm install
+cp .env.example .env
+cp .env.example .env.local
+npm run db:push
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Production Environment Template
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Local development: use `.env` / `.env.local` (localhost database)
+- Production deploy: copy `env.production.example` to your server as `.env` and replace all placeholder values
 
-## Learn More
+## Environment
 
-To learn more about Next.js, take a look at the following resources:
+- `DATABASE_URL`: PostgreSQL connection string (required)
+- `AUTOMIL_API_BASE_URL`: Automil backend base URL (optional)
+- `AUTOMIL_API_TOKEN`: Bearer token for Automil API (optional)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+If Automil env is not configured, the dashboard uses mock vehicle data.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Key API
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `GET /api/operations/summary`: dashboard summary + trip timeline + bag inventory
+- `GET /api/integrations/automil/vehicles`: automil vehicles (or mock fallback)
+- `GET/POST /api/trips`
+- `GET/PATCH /api/trips/:id` (supports updating `materials`)
+- `POST /api/bags`, `PATCH/DELETE /api/bags/:id`
